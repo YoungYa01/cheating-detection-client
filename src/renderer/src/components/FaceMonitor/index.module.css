@@ -1,0 +1,17 @@
+.faceMonitor {
+  width: 200px;
+  border-radius: 50%;
+}
+
+.face-content {
+  position: relative;
+}
+
+.lock {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 999;
+  color: lightskyblue;
+}
