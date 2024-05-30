@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import css from './index.module.css'
 import { LockOutlined, UnlockOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
@@ -11,16 +11,14 @@ import Loading from '../Loading'
  * @adte 2024/5/29
  */
 // eslint-disable-next-line react/display-name
-const FaceMonitor = forwardRef((props, ref) => {
+const FaceMonitor = () => {
   const videoRef = useRef(null)
+  const canvasRef = useRef(null)
   const [loading, setLoading] = useState(false)
   let isKeyDown = false
 
   const [isKiock, setIsKiock] = useState(false)
 
-  useImperativeHandle(ref, () => ({
-    drawCanvas: drawCanvas
-  }))
   /**
    * @description: 绘制canvas获取截图
    * @author: YoungYa
@@ -60,26 +58,22 @@ const FaceMonitor = forwardRef((props, ref) => {
         }
         videoRef.current.srcObject = stream
         videoRef.current.play()
-        // videoRef.current.onplay = () => {
-        //   const canvas = faceapi.createCanvasFromMedia(videoRef.current)
-        //   document.querySelector('.face-content').append(canvas)
-        //   setCanvas(canvas)
-        //   const displaySize = { width: videoRef.current.width, height: videoRef.current.height }
-        //   faceapi.matchDimensions(canvas, displaySize)
-        //   console.log(canvas)
-        //   setInterval(async () => {
-        //     const detections = await faceapi
-        //       .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-        //       .withFaceLandmarks()
-        //       .withFaceExpressions()
-        //     const resizedDetections = faceapi.resizeResults(detections, displaySize)
-        //     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
-        //     faceapi.draw.drawDetections(canvas, resizedDetections)
-        //     faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
-        //     faceapi.draw.drawFaceExpressions(canvas, resizedDetections)
-        //     console.log('1')
-        //   }, 100)
-        // }
+        handleTimeInterval()
+        // const canvas = faceapi.createCanvasFromMedia(videoRef.current)
+        // document.body.append(canvas)
+        // const displaySize = {width: videoRef.current.width, height: videoRef.current.height}
+        // faceapi.matchDimensions(canvas, displaySize)
+        // setInterval(async () => {
+        //   const detections = await faceapi.detectAllFaces(videoRef.current, new faceapi
+        //     .TinyFaceDetectorOptions())
+        //     .withFaceLandmarks()
+        //     .withFaceExpressions()
+        //   const resizedDetections = faceapi.resizeResults(detections, displaySize)
+        //   canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+        //   faceapi.draw.drawDetections(canvas, resizedDetections)
+        //   faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
+        //   faceapi.draw.drawFaceExpressions(canvas, resizedDetections)
+        // }, 100)
       })
       .catch((err) => {
         console.error('Error accessing media devices.', err)
@@ -106,19 +100,37 @@ const FaceMonitor = forwardRef((props, ref) => {
     }
   }
 
+  const handleTimeInterval = () => {
+    setInterval(() => {
+      drawCanvas()
+    }, 2000)
+  }
+
   useEffect(() => {
     setLoading(true)
-    // Promise.all([
-    //   faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
-    //   faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
-    //   faceapi.nets.faceRecognitionNet.loadFromUri('./models'),
-    //   faceapi.nets.faceExpressionNet.loadFromUri('./models')
-    // ]).then(videoInit())
+
     videoInit()
+    // try {
+    //   Promise.all([
+    //     faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
+    //     faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
+    //     faceapi.nets.faceRecognitionNet.loadFromUri('./models'),
+    //     faceapi.nets.faceExpressionNet.loadFromUri('./models')
+    //   ])
+    //     .then(() => {
+    //       console.log('load models success')
+    //       videoInit()
+    //     })
+    //     .catch((err) => {
+    //       console.error(err)
+    //     })
+    // } catch (e) {
+    //   console.error('Error loading models.', e)
+    // }
   }, [])
 
   return (
-    <div>
+    <div onMouseDown={handleMouseDown}>
       {loading ? (
         <Loading />
       ) : (
@@ -130,10 +142,11 @@ const FaceMonitor = forwardRef((props, ref) => {
             className={css.lock}
             onClick={() => setIsKiock(!isKiock)}
           ></Button>
-          <video ref={videoRef} className={css.faceMonitor} onMouseDown={handleMouseDown}></video>
+          <video ref={videoRef} className={css.faceMonitor}></video>
+          <canvas className="canvas" ref={canvasRef} />
         </div>
       )}
     </div>
   )
-})
+}
 export default FaceMonitor
