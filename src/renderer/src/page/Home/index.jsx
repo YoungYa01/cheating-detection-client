@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react'
+import { getExamURL } from '../../api'
 import { Button } from 'antd'
 
 const Home = () => {
-  const ipcHandle = () => {
-    window.electron.ipcRenderer.send('ping')
-  }
-
   const videoRef = useRef(document.createElement('video'))
+
+  let url = ''
+  const handleEnv = () => {
+    window.electron.ipcRenderer.send('env-check', url)
+  }
 
   /**
    * @description: 获取屏幕截图
@@ -33,6 +35,7 @@ const Home = () => {
         if (!videoRef.current) {
           return
         }
+        handleEnterExam()
         videoRef.current.srcObject = stream
         videoRef.current.play()
       })
@@ -58,27 +61,47 @@ const Home = () => {
     window.electron.ipcRenderer.send('save-canvas-as-screen-image', dataURL)
   }
 
-  const handleClick = () => drawCanvas()
-
-  const handleFaceShot = () => {
-    console.log(window.electron)
+  const handleGetExamInfo = () => {
+    getExamURL().then((response) => {
+      url = response.data
+      streamInit()
+    })
   }
 
-  useEffect(() => streamInit(), [])
+  const handleEnterExam = () => {
+    if (!url) {
+      return getExamURL().then((response) => {
+        window.electron.ipcRenderer.send('enter-exam', response.data)
+      })
+    }
+    window.electron.ipcRenderer.send('enter-exam', url)
+  }
+
+  const handleRefresh = () => window.electron.ipcRenderer.send('refresh-exam', url)
+
+  const timerShot = () => {
+    return setInterval(() => {
+      drawCanvas()
+    }, 3000)
+  }
+
+  useEffect(() => {
+    handleGetExamInfo()
+    const timer = timerShot()
+    return () => {
+      clearInterval(timer)
+    }
+  }, [])
 
   return (
-    <main>
+    <>
       <header className="header">
-        <h1>考试监控中·····</h1>
+        <h3 style={{ color: 'red', textAlign: 'center' }}>考试监控中·····</h3>
+        <Button onClick={handleEnterExam}>进入考试</Button>
+        <Button onClick={handleRefresh}>刷新考试</Button>
       </header>
-      <video ref={videoRef} style={{ width: '100%' }}></video>
-      <div className="actions">
-        <Button onClick={ipcHandle}>Ping</Button>
-        <Button onClick={handleClick}>Screen IPC</Button>
-        <Button onClick={handleFaceShot}>Face IPC</Button>
-      </div>
-      {/*<FaceMonitor ref={faceMonitorRef} />*/}
-    </main>
+      <video ref={videoRef} style={{ width: '0', height: 0, visibility: 'hidden' }}></video>
+    </>
   )
 }
 

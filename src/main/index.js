@@ -1,30 +1,44 @@
-import { app, shell, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, Menu, screen } from 'electron'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { saveImage } from '../utils/download'
 import { join } from 'path'
+import { closeAllWindows } from './utils'
+import { ExamWindowConf, FaceWindowConf, MainWindowConf } from './windowConf'
+import { checkOtherProcessInfo } from '../utils/processCheck'
 
-function createWindow() {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
-    show: false,
-    autoHideMenuBar: true,
-    ...(process.platform === 'win32' ? { icon: 'resources/favicon.png' } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
-  })
+let faceWindow = null
+
+let examWindow = null
+
+/**
+ * @description: 创建主窗口->监控窗口
+ * @author: YoungYa
+ * @adte 2024/6/2
+ */
+function createWindow(conf = {}) {
+  // 窗口配置
+  const winConf = {
+    ...MainWindowConf,
+    ...conf
+  }
+  // 创建主窗口
+  const mainWindow = new BrowserWindow(winConf)
+  // 关闭默认菜单
   Menu.setApplicationMenu(null)
-
+  // 显示窗体
   mainWindow.on('ready-to-show', () => {
+    const { width } = screen.getPrimaryDisplay().workAreaSize
+    mainWindow.setPosition(width / 2 - winConf.width / 2, 0)
     mainWindow.show()
   })
-
+  // 加载监控页面
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+  // 主窗体关闭时关闭其他窗口
+  mainWindow.on('closed', () => {
+    closeAllWindows(mainWindow)
   })
 
   // HMR for renderer base on electron-vite cli.
@@ -34,37 +48,80 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+  let envCheckState = false
+
+  function checkEnv() {
+    console.log('@')
+    if (envCheckState) {
+      return
+    }
+    envCheckState = true
+    checkOtherProcessInfo(examWindow)
+      .then(() => {
+        envCheckState = false
+        checkEnv()
+      })
+      .catch(() => {
+        envCheckState = false
+      })
+  }
+
+  ipcMain.on('env-check', () => {
+    checkEnv()
+  })
+  // 重新唤醒进入考试
+  ipcMain.on('enter-exam', (_, examURL) => {
+    if (examWindow === null) {
+      examWindow = createExamWindow(examURL)
+      examWindow.loadURL(examURL)
+    }
+    checkEnv()
+  })
+  ipcMain.on('refresh-exam', () => {
+    examWindow?.webContents.reload()
+  })
 }
 
-const createFaceMonitor = () => {
-  const listWindow = new BrowserWindow({
-    width: 220,
-    height: 300,
-    show: false,
-    frame: false,
-    autoHideMenuBar: true,
-    resizable: false,
-    alwaysOnTop: true,
-    transparent: true,
-    ...(process.platform === 'win32' ? { icon: 'resources/favicon.png' } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
-  })
-  listWindow.on('ready-to-show', () => {
-    listWindow.show()
-    listWindow.setPosition(100, 100)
+/**
+ * @description: 创建监控窗口
+ * @author: YoungYa
+ * @adte 2024/6/2
+ */
+const createFaceMonitorWindow = (conf = {}) => {
+  const winConf = {
+    ...FaceWindowConf,
+    ...conf
+  }
+  faceWindow = new BrowserWindow(winConf)
+  faceWindow.on('ready-to-show', () => {
+    const { width } = screen.getPrimaryDisplay().workAreaSize
+    faceWindow.show()
+    faceWindow.setPosition(width - winConf.width - 100, 100)
   })
   ipcMain.on('move-face', (event, data) => {
     const { x, y } = data
-    listWindow.setPosition(x, y)
+    faceWindow.setPosition(x, y)
   })
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    listWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/#/faceMonitor')
+    faceWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/#/faceMonitor')
   } else {
-    listWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    faceWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+}
+/**
+ * @description: 创建考试窗口
+ * @author: YoungYa
+ * @adte 2024/6/2
+ */
+const createExamWindow = () => {
+  examWindow = new BrowserWindow(ExamWindowConf)
+  examWindow.on('ready-to-show', () => {
+    examWindow.show()
+  })
+  examWindow.on('close', () => {
+    examWindow = null
+  })
+  return examWindow
 }
 
 app.whenReady().then(() => {
@@ -72,12 +129,6 @@ app.whenReady().then(() => {
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
-  })
-
-  // IPC test
-  ipcMain.on('ping', () => {
-    console.log('pong')
-    // checkOtherProcessInfo()
   })
 
   /**
@@ -107,7 +158,7 @@ app.whenReady().then(() => {
   /**
    * 创建人脸监控窗口
    */
-  createFaceMonitor()
+  createFaceMonitorWindow()
 
   app.on('activate', function () {
     // On macOS, it's common to re-create a window in the app when the
@@ -116,14 +167,8 @@ app.whenReady().then(() => {
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app"s specific main process
-// code. You can also put them in separate files and require them here.

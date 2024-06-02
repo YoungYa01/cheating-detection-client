@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getUserToken } from '../utils/localstorage'
+import { getUserToken } from '../../../utils/localstorage'
 import { message } from 'antd'
 
 /**
@@ -9,7 +9,7 @@ const controller = new AbortController()
 
 /**axios实例，用于发起网络请求*/
 const request = axios.create({
-  baseURL: process.env.NODE_ENV === 'development' ? '' : 'http://localhost:8080',
+  baseURL: import.meta.env.VITE_BASE_URL,
   timeout: 5000
 })
 

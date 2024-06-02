@@ -10,7 +10,6 @@ import Loading from '../Loading'
  * @author: YoungYa
  * @adte 2024/5/29
  */
-// eslint-disable-next-line react/display-name
 const FaceMonitor = () => {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -58,7 +57,7 @@ const FaceMonitor = () => {
         }
         videoRef.current.srcObject = stream
         videoRef.current.play()
-        handleTimeInterval()
+        // handleTimeInterval()
         // const canvas = faceapi.createCanvasFromMedia(videoRef.current)
         // document.body.append(canvas)
         // const displaySize = {width: videoRef.current.width, height: videoRef.current.height}
@@ -105,6 +104,11 @@ const FaceMonitor = () => {
       drawCanvas()
     }, 2000)
   }
+
+  window.electron.ipcRenderer.on('ping', () => {
+    drawCanvas()
+    console.log('pong 截图')
+  })
 
   useEffect(() => {
     setLoading(true)
