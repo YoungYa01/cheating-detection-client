@@ -5,6 +5,14 @@ import { join } from 'path'
 import { closeAllWindows } from './utils'
 import { ExamWindowConf, FaceWindowConf, MainWindowConf } from './windowConf'
 import { checkOtherProcessInfo } from '../utils/processCheck'
+import {
+  ENTER_EXAM,
+  ENV_CHECK,
+  MOVE_FACE,
+  REFRESH_EXAM,
+  SAVE_CANVAS_AS_PORTRAIT_IMAGE,
+  SAVE_CANVAS_AS_SCREEN_IMAGE
+} from '../utils/StaticMessage'
 
 let faceWindow = null
 
@@ -51,7 +59,6 @@ function createWindow(conf = {}) {
   let envCheckState = false
 
   function checkEnv() {
-    console.log('@')
     if (envCheckState) {
       return
     }
@@ -66,18 +73,18 @@ function createWindow(conf = {}) {
       })
   }
 
-  ipcMain.on('env-check', () => {
+  ipcMain.on(ENV_CHECK, () => {
     checkEnv()
   })
   // 重新唤醒进入考试
-  ipcMain.on('enter-exam', (_, examURL) => {
+  ipcMain.on(ENTER_EXAM, (_, examURL) => {
     if (examWindow === null) {
       examWindow = createExamWindow(examURL)
       examWindow.loadURL(examURL)
     }
     checkEnv()
   })
-  ipcMain.on('refresh-exam', () => {
+  ipcMain.on(REFRESH_EXAM, () => {
     examWindow?.webContents.reload()
   })
 }
@@ -98,7 +105,7 @@ const createFaceMonitorWindow = (conf = {}) => {
     faceWindow.show()
     faceWindow.setPosition(width - winConf.width - 100, 100)
   })
-  ipcMain.on('move-face', (event, data) => {
+  ipcMain.on(MOVE_FACE, (event, data) => {
     const { x, y } = data
     faceWindow.setPosition(x, y)
   })
@@ -135,7 +142,7 @@ app.whenReady().then(() => {
    * 保存屏幕截图
    * @param {*} event
    */
-  ipcMain.on('save-canvas-as-screen-image', (event, dataURL) => {
+  ipcMain.on(SAVE_CANVAS_AS_SCREEN_IMAGE, (event, dataURL) => {
     const base64Data = dataURL?.replace(/^data:image\/png;base64,/, '')
     const dataBuffer = Buffer.from(base64Data, 'base64')
     const filePath = `${__dirname}/../../screenshot/screen/${Date.now()}.png`
@@ -145,7 +152,7 @@ app.whenReady().then(() => {
    * 保存摄像头截图
    * @param {*} event
    */
-  ipcMain.on('save-canvas-as-portrait-image', (event, dataURL) => {
+  ipcMain.on(SAVE_CANVAS_AS_PORTRAIT_IMAGE, (event, dataURL) => {
     const base64Data = dataURL?.replace(/^data:image\/png;base64,/, '')
     const dataBuffer = Buffer.from(base64Data, 'base64')
     const filePath = `${__dirname}/../../screenshot/portrait/${Date.now()}.png`

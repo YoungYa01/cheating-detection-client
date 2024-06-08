@@ -1,0 +1,6 @@
+export const ENV_CHECK = 'env-check'
+export const ENTER_EXAM = 'enter-exam'
+export const REFRESH_EXAM = 'refresh-exam'
+export const MOVE_FACE = 'move-face'
+export const SAVE_CANVAS_AS_SCREEN_IMAGE = 'save-canvas-as-screen-image'
+export const SAVE_CANVAS_AS_PORTRAIT_IMAGE = 'save-canvas-as-portrait-image'

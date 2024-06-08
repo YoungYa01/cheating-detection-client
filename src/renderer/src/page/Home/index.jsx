@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { getExamURL } from '../../api'
 import { Button } from 'antd'
+import { ENTER_EXAM, ENV_CHECK, REFRESH_EXAM, SAVE_CANVAS_AS_SCREEN_IMAGE } from '../../../../utils/StaticMessage'
 
 const Home = () => {
   const videoRef = useRef(document.createElement('video'))
 
   let url = ''
   const handleEnv = () => {
-    window.electron.ipcRenderer.send('env-check', url)
+    window.electron.ipcRenderer.send(ENV_CHECK, url)
   }
 
   /**
@@ -58,7 +59,7 @@ const Home = () => {
     canvas.height = videoRef.current.videoHeight
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
     const dataURL = canvas.toDataURL('image/png')
-    window.electron.ipcRenderer.send('save-canvas-as-screen-image', dataURL)
+    window.electron.ipcRenderer.send(SAVE_CANVAS_AS_SCREEN_IMAGE, dataURL)
   }
 
   const handleGetExamInfo = () => {
@@ -71,13 +72,13 @@ const Home = () => {
   const handleEnterExam = () => {
     if (!url) {
       return getExamURL().then((response) => {
-        window.electron.ipcRenderer.send('enter-exam', response.data)
+        window.electron.ipcRenderer.send(ENTER_EXAM, response.data)
       })
     }
-    window.electron.ipcRenderer.send('enter-exam', url)
+    window.electron.ipcRenderer.send(ENTER_EXAM, url)
   }
 
-  const handleRefresh = () => window.electron.ipcRenderer.send('refresh-exam', url)
+  const handleRefresh = () => window.electron.ipcRenderer.send(REFRESH_EXAM, url)
 
   const timerShot = () => {
     return setInterval(() => {
@@ -87,7 +88,7 @@ const Home = () => {
 
   useEffect(() => {
     handleGetExamInfo()
-    const timer = timerShot()
+    // const timer = timerShot()
     return () => {
       clearInterval(timer)
     }

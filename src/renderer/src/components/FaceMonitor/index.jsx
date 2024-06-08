@@ -3,6 +3,8 @@ import css from './index.module.css'
 import { LockOutlined, UnlockOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
 import Loading from '../Loading'
+import { MOVE_FACE, SAVE_CANVAS_AS_PORTRAIT_IMAGE } from '../../../../utils/StaticMessage'
+import * as faceapi from 'face-api.js'
 
 /**
  * @description: 摄像头监控
@@ -18,6 +20,103 @@ const FaceMonitor = () => {
 
   const [isKiock, setIsKiock] = useState(false)
 
+  let timeout = null
+  let options = null
+  let modalLoaded = false
+  /**初始化模型加载 */
+  async function fnLoadModel() {
+    if (!modalLoaded) {
+      modalLoaded = true
+      return
+    }
+    // 模型文件访问路径
+    const modelsPath = `/models`
+    // 面部轮廓模型
+    await faceapi.nets.faceLandmark68Net.loadFromUri(modelsPath)
+    // 面部表情模型
+    await faceapi.nets.faceExpressionNet.loadFromUri(modelsPath)
+    // 年龄性别模型
+    await faceapi.nets.ageGenderNet.loadFromUri(modelsPath)
+    // 模型参数-tinyFaceDetector
+    await faceapi.nets.tinyFaceDetector.loadFromUri(modelsPath)
+    options = new faceapi.TinyFaceDetectorOptions({
+      inputSize: 416, // 160 224 320 416 512 608
+      scoreThreshold: 0.5 // 0 ~ 1
+    })
+
+    // 输出库版本
+    console.log(
+      `FaceAPI Version: ${faceapi?.version || '(not loaded)'} \nTensorFlow/JS Version: ${
+        faceapi.tf?.version_core || '(not loaded)'
+      } \nBackend: ${
+        faceapi.tf?.getBackend() || '(not loaded)'
+      } \nModels loaded: ${faceapi.tf.engine().state.numTensors} tensors`
+    )
+  }
+  /**根据模型参数识别绘制 */
+  async function fnRedraw() {
+    if (!videoRef.current || !canvasRef.current) return
+
+    // 暂停视频时清除定时
+    if (videoRef.current.paused) {
+      clearTimeout(timeout)
+      timeout = 0
+      return
+    }
+
+    // 识别绘制人脸信息
+    if (!videoRef.current) {
+      console.log('video is null')
+      return
+    }
+    const detect = await faceapi
+      .detectAllFaces(videoRef.current, options)
+      // 需引入面部轮廓模型
+      .withFaceLandmarks()
+      // 需引入面部表情模型
+      .withFaceExpressions()
+      // 需引入年龄性别模型
+      .withAgeAndGender()
+
+    // 无识别数据时，清除定时重新再次识别
+    if (!detect) {
+      clearTimeout(timeout)
+      timeout = 0
+      fnRedraw()
+      return
+    }
+
+    // 匹配元素大小
+    const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true)
+    const result = faceapi.resizeResults(detect, dims)
+
+    // 面框分值
+    faceapi.draw.drawDetections(canvasRef.current, result)
+    // 面部轮廓
+    // 需引入面部轮廓模型
+    faceapi.draw.drawFaceLandmarks(canvasRef.current, result)
+    // 面部表情
+    // 需引入面部表情模型
+    faceapi.draw.drawFaceExpressions(canvasRef.current, result, 0.05)
+    // 年龄性别
+    // 需引入年龄性别模型模型
+    const drawItem = (item) => {
+      const { age, gender, genderProbability } = item
+      new faceapi.draw.DrawTextField(
+        [`${Math.round(age)} Age`, `${gender} (${Math.round(genderProbability)})`],
+        item.detection.box.topRight
+      ).draw(canvasRef.current)
+    }
+    // 多结果
+    if (Array.isArray(result)) {
+      result.forEach((item) => drawItem(item))
+    } else {
+      drawItem(result)
+    }
+
+    // 定时器句柄
+    timeout = setTimeout(() => fnRedraw(), 0)
+  }
   /**
    * @description: 绘制canvas获取截图
    * @author: YoungYa
@@ -33,7 +132,7 @@ const FaceMonitor = () => {
     canvas.height = videoRef.current.videoHeight
     ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
     const dataURL = canvas.toDataURL('image/png')
-    window.electron.ipcRenderer.send('save-canvas-as-portrait-image', dataURL)
+    window.electron.ipcRenderer.send(SAVE_CANVAS_AS_PORTRAIT_IMAGE, dataURL)
   }
 
   /**
@@ -42,6 +141,7 @@ const FaceMonitor = () => {
    * @adte 2024/5/29
    */
   const videoInit = () => {
+    console.log('videoInit')
     navigator.mediaDevices
       .getUserMedia({
         video: {
@@ -58,21 +158,7 @@ const FaceMonitor = () => {
         videoRef.current.srcObject = stream
         videoRef.current.play()
         // handleTimeInterval()
-        // const canvas = faceapi.createCanvasFromMedia(videoRef.current)
-        // document.body.append(canvas)
-        // const displaySize = {width: videoRef.current.width, height: videoRef.current.height}
-        // faceapi.matchDimensions(canvas, displaySize)
-        // setInterval(async () => {
-        //   const detections = await faceapi.detectAllFaces(videoRef.current, new faceapi
-        //     .TinyFaceDetectorOptions())
-        //     .withFaceLandmarks()
-        //     .withFaceExpressions()
-        //   const resizedDetections = faceapi.resizeResults(detections, displaySize)
-        //   canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
-        //   faceapi.draw.drawDetections(canvas, resizedDetections)
-        //   faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
-        //   faceapi.draw.drawFaceExpressions(canvas, resizedDetections)
-        // }, 100)
+        setTimeout(() => fnRedraw(), 300)
       })
       .catch((err) => {
         console.error('Error accessing media devices.', err)
@@ -90,7 +176,7 @@ const FaceMonitor = () => {
       if (isKeyDown) {
         const x = ev.screenX - dinatesX
         const y = ev.screenY - dinatesY
-        window.electron.ipcRenderer.send('move-face', { x, y })
+        window.electron.ipcRenderer.send(MOVE_FACE, { x, y })
       }
     }
     document.onmouseup = () => {
@@ -99,38 +185,20 @@ const FaceMonitor = () => {
     }
   }
 
+  // eslint-disable-next-line no-unused-vars
   const handleTimeInterval = () => {
     setInterval(() => {
       drawCanvas()
     }, 2000)
   }
 
-  window.electron.ipcRenderer.on('ping', () => {
-    drawCanvas()
-    console.log('pong 截图')
-  })
-
   useEffect(() => {
     setLoading(true)
+    fnLoadModel().then(() => videoInit())
 
-    videoInit()
-    // try {
-    //   Promise.all([
-    //     faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
-    //     faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
-    //     faceapi.nets.faceRecognitionNet.loadFromUri('./models'),
-    //     faceapi.nets.faceExpressionNet.loadFromUri('./models')
-    //   ])
-    //     .then(() => {
-    //       console.log('load models success')
-    //       videoInit()
-    //     })
-    //     .catch((err) => {
-    //       console.error(err)
-    //     })
-    // } catch (e) {
-    //   console.error('Error loading models.', e)
-    // }
+    return () => {
+      clearTimeout(timeout)
+    }
   }, [])
 
   return (
@@ -147,7 +215,7 @@ const FaceMonitor = () => {
             onClick={() => setIsKiock(!isKiock)}
           ></Button>
           <video ref={videoRef} className={css.faceMonitor}></video>
-          <canvas className="canvas" ref={canvasRef} />
+          <canvas className={css.faceMonitor} ref={canvasRef}></canvas>
         </div>
       )}
     </div>
