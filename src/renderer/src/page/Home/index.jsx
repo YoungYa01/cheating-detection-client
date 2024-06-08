@@ -88,7 +88,7 @@ const Home = () => {
 
   useEffect(() => {
     handleGetExamInfo()
-    // const timer = timerShot()
+    const timer = timerShot()
     return () => {
       clearInterval(timer)
     }
