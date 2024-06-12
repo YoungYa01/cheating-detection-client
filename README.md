@@ -1,4 +1,4 @@
-# 程序设计在线考试作弊监测系统
+# 程序设计在线考试作弊监测系统[![Fork me on Gitee](https://gitee.com/Young_Ya/cheating-detection-client/widgets/widget_1.svg)](https://gitee.com/Young_Ya/cheating-detection-client)
 
 Online cheating Monitoring system for programming
 
@@ -61,3 +61,4 @@ $ yarn build:linux
 
 人靓监测部分
 ![人脸监测](/resources/人脸监测.png)
+

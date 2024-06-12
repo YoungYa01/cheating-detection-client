@@ -79,8 +79,8 @@ function createWindow(conf = {}) {
   // 重新唤醒进入考试
   ipcMain.on(ENTER_EXAM, (_, examURL) => {
     if (examWindow === null) {
-      examWindow = createExamWindow(examURL)
-      examWindow.loadURL(examURL)
+      examWindow = createExamWindow("http://222.196.35.228:8081/patest/html/login.html")
+      examWindow.loadURL("http://222.196.35.228:8081/patest/html/login.html")
     }
     checkEnv()
   })
